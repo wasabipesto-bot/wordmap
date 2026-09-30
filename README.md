@@ -14,8 +14,8 @@ nearest neighbours into a 2-D map, which is drawn with [deck.gl][deck] as a stat
   words appear as labels.
 - **Search** for a word to fly to it. Its panel lists the words truly one and two edits away,
   and lines on the map point to the one-edit ones.
-- **Type anything else**, a made-up word like *blorf*, and a ring marks where it would sit:
-  beside the most central of its closest real words.
+- **Type anything else**, a made-up word like *blorf*, and a ring marks where it would sit: on the
+  most central of its closest real words (*“blorf” by born*).
 - **Colour** by part of speech, word length, frequency, or how crowded a word's neighbourhood is
   for its length. **Filter** by part of speech, length, or to the most common *N* words.
 - **Switch** between all word forms and base forms only (*run* but not *runs*, *ran*,

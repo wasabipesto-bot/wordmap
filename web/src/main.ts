@@ -59,6 +59,9 @@ let data: MapData;
 let defs: DefEntry[] | null = null;
 let enc: Encoders;
 let deck: Deck<OrthographicView>;
+// One stable data object for the points layer: a new object would make deck.gl recompute every
+// point's attributes on each render.
+let allPoints: { length: number };
 // Distances from the selected word to every word in the current view, computed on selection.
 let selectedDistances: Uint8Array | null = null;
 
@@ -112,7 +115,6 @@ function pointColor(i: number): RGBA {
 // Layers
 
 function layers() {
-  const n = data.meta.count;
   const chrome = CHROME[state.theme];
   const key = layoutKey();
   const xy = data.layouts[key];
@@ -122,13 +124,12 @@ function layers() {
     target[2] = 0;
     return target as [number, number, number];
   };
-  const all = { length: n };
   const easing = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
   const out: unknown[] = [
     new ScatterplotLayer({
       id: "points",
-      data: all,
+      data: allPoints,
       getPosition,
       getFillColor: (_: unknown, { index }: { index: number }) => pointColor(index),
       getRadius: 1,
@@ -245,7 +246,9 @@ function markList(): Mark[] {
   if (sel !== null && inView(sel)) marks.push({ position: position(sel), text: data.words[sel], strong: true, word: sel });
   for (const i of state.ladder ?? [])
     if (i !== sel) marks.push({ position: position(i), text: data.words[i], strong: false, word: i });
-  if (state.placed) marks.push({ position: state.placed.position, text: `“${state.placed.text}”`, strong: true });
+  // A placed string shares its anchor word's spot, so one label names both.
+  const p = state.placed;
+  if (p) marks.push({ position: p.position, text: `“${p.text}” by ${data.words[p.anchor]}`, strong: true, word: p.anchor });
   return marks;
 }
 
@@ -491,7 +494,7 @@ function showPlaced(p: Placed) {
   const body = $("details-body");
   body.replaceChildren(
     el("h2", `“${p.text}”`),
-    el("p", `Not in this word list. The ring shows where it would sit: beside “${data.words[p.anchor]}”, the most central of its closest words.`, "sub"),
+    el("p", `Not in this word list. The ring shows where it would sit: next to “${data.words[p.anchor]}”, the most central of its closest words.`, "sub"),
     el("h3", "Nearest words"),
     wordChips(
       p.near.map((x) => x.index),
@@ -528,9 +531,7 @@ function placement(text: string): Placed | null {
   const spread = (i: number) =>
     closest.reduce((sum, j) => sum + Math.hypot(position(i)[0] - position(j)[0], position(i)[1] - position(j)[1]), 0);
   const anchor = closest.reduce((best, i) => (spread(i) < spread(best) ? i : best), closest[0]);
-  const [ax, ay] = position(anchor);
-  const nudge = 7 / 2 ** (state.fullZoom + FLY_ZOOM_IN); // ~7 px beside the anchor once flown in
-  return { text, position: [ax + nudge, ay - nudge], near, anchor };
+  return { text, position: position(anchor), near, anchor };
 }
 
 function placeString(raw: string) {
@@ -924,6 +925,7 @@ function applyTheme() {
 async function main() {
   applyTheme();
   data = await loadMapData();
+  allPoints = { length: data.meta.count };
   state.posOn = data.meta.posClasses.map(() => true);
   state.topN = data.meta.count;
   state.lenMax = data.meta.maxLength;
