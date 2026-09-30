@@ -21,7 +21,7 @@ build:
 preview: build
     cd web && npx vite preview --host 127.0.0.1
 
-# Every data step, from downloads to the files the site loads (~15 minutes on 4 cores).
+# Every data step, from downloads to the files the site loads (~10 minutes on 4 cores, plus downloads).
 pipeline: fetch wiktionary vocab neighbors layout export
 
 # Download the raw sources (~3 GB, mostly the Wiktionary dump) and build the ESDB word database.

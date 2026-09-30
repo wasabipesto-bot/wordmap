@@ -8,12 +8,14 @@ insertions, deletions or substitutions that turn one into the other (*cat → co
 *cat → coast* is 2). Every pair of words is compared exactly. [UMAP][umap] then turns each word's
 nearest neighbours into a 2-D map, which is drawn with [deck.gl][deck] as a static site.
 
+![The -tion region, zoomed in, with the details panel for "information"](docs/zoomed.png)
+
 - **Hover** a dot for the word, its part of speech and a short definition. **Zoom in** and the
   words appear as labels.
-- **Search** for a word to fly to it. Its panel lists the words truly one and two edits away
-  (lines on the map point to them).
-- **Type anything else**, a made-up word like *blorf*, and a ring marks where it would sit among
-  its nearest real words.
+- **Search** for a word to fly to it. Its panel lists the words truly one and two edits away,
+  and lines on the map point to the one-edit ones.
+- **Type anything else**, a made-up word like *blorf*, and a ring marks where it would sit:
+  beside the most central of its closest real words.
 - **Colour** by part of speech, word length, frequency, or how crowded a word's neighbourhood is
   for its length. **Filter** by part of speech, length, or to the most common *N* words.
 - **Switch** between all word forms and base forms only (*run* but not *runs*, *ran*,
@@ -22,6 +24,8 @@ nearest neighbours into a 2-D map, which is drawn with [deck.gl][deck] as a stat
   (*cat → cot → cog → dog*).
 
 ## What the map shows (and doesn't)
+
+![The whole map, coloured by part of speech](docs/overview.png)
 
 The strongest pattern is **length**. Two words can't be closer than their difference in length,
 so the map runs from short words at one end to long words at the other. The clumps inside that
@@ -50,9 +54,10 @@ adjacencies.** The details panel always shows a word's true neighbours.
 
 **densMAP** (UMAP with a density-preserving term) makes on-screen spacing follow how crowded each
 neighbourhood really is. That shows best where spelling allows many near-variants and where it
-doesn't. In a test on 100k words it raised the correlation between on-screen spacing and true
-neighbourhood density from 0.35 to 0.79, but halved how often on-screen neighbours are true
-neighbours. It's offered as the second layout.
+doesn't. On this vocabulary, it raises the rank correlation between a word's on-screen spacing
+and its true neighbourhood density (OLD20, the mean edit distance to its 20 closest words) from
+0.25 to 0.74. The cost is locality: only 7.6% of on-screen neighbours are true near neighbours,
+against 17.2% for UMAP. It's offered as the second layout.
 
 ## Vocabulary
 
@@ -102,11 +107,11 @@ either way.
 ## Running it
 
 Requirements: [uv](https://docs.astral.sh/uv/), [just](https://just.systems/), Node 20+, git and
-make. Rebuilding the data takes about 4 GB of disk.
+make. Rebuilding the data takes about 3.5 GB of disk.
 
 ```sh
 just setup      # Python and npm dependencies
-just dev        # serve the site at http://localhost:5173
+just dev        # serve the site at http://127.0.0.1:5173
 just build      # static site in web/dist/ — copy it to any static host
 ```
 
@@ -114,7 +119,7 @@ The built map data is committed in `web/public/data/`, so the site runs without 
 pipeline. To rebuild the data from the original sources:
 
 ```sh
-just pipeline   # all steps below, about 15 minutes on 4 cores
+just pipeline   # all steps below: about 10 minutes on 4 cores, plus the ~3 GB download
 ```
 
 | step | what it does |
