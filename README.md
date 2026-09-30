@@ -3,6 +3,8 @@
 An interactive map of the 50,000 most common English words, laid out so that words a few
 letter edits apart sit near each other.
 
+**Live: <https://wasabipesto-bot.github.io/wordmap/>**
+
 The distance between two words is their [Levenshtein distance][lev]: the number of single-letter
 insertions, deletions or substitutions that turn one into the other (*cat → cot* is 1,
 *cat → coast* is 2). Every pair of words is compared exactly. [UMAP][umap] then turns each word's
@@ -114,6 +116,9 @@ just setup      # Python and npm dependencies
 just dev        # serve the site at http://127.0.0.1:5173
 just build      # static site in web/dist/ — copy it to any static host
 ```
+
+Pushes to `main` that touch `web/` are built and published to GitHub Pages by
+`.github/workflows/pages.yml`.
 
 The built map data is committed in `web/public/data/`, so the site runs without the data
 pipeline. To rebuild the data from the original sources:
