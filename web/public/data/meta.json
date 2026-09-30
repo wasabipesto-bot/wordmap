@@ -1,0 +1,137 @@
+{
+ "generated": "2026-09-30",
+ "count": 50000,
+ "baseCount": 30177,
+ "posClasses": [
+  "noun",
+  "verb",
+  "adjective",
+  "adverb",
+  "function",
+  "interjection",
+  "other"
+ ],
+ "columns": [
+  {
+   "name": "pos",
+   "dtype": "uint8",
+   "offset": 0,
+   "length": 50000
+  },
+  {
+   "name": "length",
+   "dtype": "uint8",
+   "offset": 50000,
+   "length": 50000
+  },
+  {
+   "name": "is_base",
+   "dtype": "uint8",
+   "offset": 100000,
+   "length": 50000
+  },
+  {
+   "name": "zipf",
+   "dtype": "float32",
+   "offset": 150000,
+   "length": 50000
+  },
+  {
+   "name": "n1",
+   "dtype": "uint16",
+   "offset": 350000,
+   "length": 50000
+  },
+  {
+   "name": "n2",
+   "dtype": "uint16",
+   "offset": 450000,
+   "length": 50000
+  },
+  {
+   "name": "old20",
+   "dtype": "float32",
+   "offset": 550000,
+   "length": 50000
+  },
+  {
+   "name": "density_vs_length",
+   "dtype": "float32",
+   "offset": 750000,
+   "length": 50000
+  },
+  {
+   "name": "base_density_vs_length",
+   "dtype": "float32",
+   "offset": 950000,
+   "length": 50000
+  },
+  {
+   "name": "umap",
+   "dtype": "float32",
+   "offset": 1150000,
+   "length": 100000
+  },
+  {
+   "name": "densmap",
+   "dtype": "float32",
+   "offset": 1550000,
+   "length": 100000
+  },
+  {
+   "name": "base_umap",
+   "dtype": "float32",
+   "offset": 1950000,
+   "length": 100000
+  },
+  {
+   "name": "base_densmap",
+   "dtype": "float32",
+   "offset": 2350000,
+   "length": 100000
+  }
+ ],
+ "layouts": {
+  "umap": {
+   "column": "umap",
+   "bounds": [
+    -1030.3465576171875,
+    -866.972412109375,
+    1262.48291015625,
+    994.8886108398438
+   ]
+  },
+  "densmap": {
+   "column": "densmap",
+   "bounds": [
+    -976.1715087890625,
+    -1082.8280029296875,
+    1728.0677490234375,
+    1623.8377685546875
+   ]
+  },
+  "base_umap": {
+   "column": "base_umap",
+   "bounds": [
+    -1030.3465576171875,
+    -866.972412109375,
+    1262.48291015625,
+    869.2642211914062
+   ]
+  },
+  "base_densmap": {
+   "column": "base_densmap",
+   "bounds": [
+    -924.516845703125,
+    -1082.8280029296875,
+    1589.968017578125,
+    1478.12841796875
+   ]
+  }
+ },
+ "zipfRange": [
+  2.01,
+  7.7299999999999995
+ ],
+ "maxLength": 22
+}
