@@ -1,0 +1,9 @@
+# pipeline inputs and intermediates (rebuilt by `just fetch` / `just pipeline`)
+/data/
+__pycache__/
+.venv/
+.ruff_cache/
+
+# web
+/web/node_modules/
+/web/dist/
