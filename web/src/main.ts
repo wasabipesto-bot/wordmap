@@ -518,25 +518,30 @@ function select(i: number) {
   render();
 }
 
-function placeString(raw: string) {
-  const text = raw.trim().toLowerCase();
-  if (!text) return;
+/** Where a string sits in the current layout. Averaging its nearest words' positions can land far
+ * from all of them, because true neighbours are often scattered across the map; instead it sits
+ * beside the most central of its closest words (least total on-map distance to the others). */
+function placement(text: string): Placed | null {
   const near = nearest(text, data.words, inView, 8);
-  if (!near.length) return;
-  // Averaging the nearest words' positions can land far from all of them, because true
-  // neighbours are often scattered across the map. Instead sit next to the most central of the
-  // closest words: the one with the least total on-map distance to the others at that distance.
+  if (!near.length) return null;
   const closest = near.filter((x) => x.dist === near[0].dist).map((x) => x.index);
   const spread = (i: number) =>
     closest.reduce((sum, j) => sum + Math.hypot(position(i)[0] - position(j)[0], position(i)[1] - position(j)[1]), 0);
   const anchor = closest.reduce((best, i) => (spread(i) < spread(best) ? i : best), closest[0]);
   const [ax, ay] = position(anchor);
   const nudge = 7 / 2 ** (state.fullZoom + FLY_ZOOM_IN); // ~7 px beside the anchor once flown in
-  state.placed = { text, position: [ax + nudge, ay - nudge], near, anchor };
+  return { text, position: [ax + nudge, ay - nudge], near, anchor };
+}
+
+function placeString(raw: string) {
+  const text = raw.trim().toLowerCase();
+  const placed = text ? placement(text) : null;
+  if (!placed) return;
+  state.placed = placed;
   state.selected = null;
   selectedDistances = null;
-  showPlaced(state.placed);
-  flyTo(state.placed.position);
+  showPlaced(placed);
+  flyTo(placed.position);
   render();
 }
 
@@ -613,23 +618,56 @@ function setPressed(attr: string, value: string) {
   });
 }
 
-function animateLayoutChange() {
-  state.transitioning = true;
-  // Layouts differ in extent (densMAP spreads sparse words far out). From the overview, reframe
-  // the camera along with the points; when zoomed in, stay where the reader is.
+/** Switch view or layout without losing the reader's place: from the overview the camera reframes
+ * the new layout; zoomed in, it follows the selected word, the placed string, or the word nearest
+ * the middle of the screen to its new position while the points animate there. */
+function changeLayout(update: () => void) {
+  const vp = deck.getViewports()[0];
+  let anchor: number | null = state.selected ?? state.placed?.anchor ?? null;
+  if (anchor === null && vp) {
+    const [cx, cy] = vp.unproject([vp.width / 2, vp.height / 2]);
+    let best = Infinity;
+    for (let i = 0; i < data.meta.count; i++) {
+      if (!visible(i)) continue;
+      const [x, y] = position(i);
+      const d = (x - cx) ** 2 + (y - cy) ** 2;
+      if (d < best) [best, anchor] = [d, i];
+    }
+  }
+  update();
+
+  if (state.selected !== null) {
+    if (inView(state.selected)) {
+      selectedDistances = distancesFrom(data.words[state.selected], data.words, inView);
+      showDetails(state.selected);
+    } else {
+      state.selected = null;
+      selectedDistances = null;
+      $("details").hidden = true;
+    }
+  }
+  if (state.placed) {
+    state.placed = placement(state.placed.text);
+    if (state.placed) showPlaced(state.placed);
+  }
+  state.ladder = null;
+  $("ladder-result").textContent = "";
+  updateStatus();
+
   const atOverview = state.zoom < state.fullZoom + 0.6;
   const fit = fitView();
   state.fullZoom = fit.zoom as number;
-  if (atOverview) {
-    deck.setProps({
-      initialViewState: {
-        ...fit,
-        transitionDuration: TRANSITION_MS,
-        transitionInterpolator: new LinearInterpolator(["target", "zoom"]),
-      } as OrthographicViewState,
-    });
-    state.zoom = state.fullZoom;
-  }
+  const follow = state.placed?.position ?? (anchor !== null && inView(anchor) ? position(anchor) : null);
+  const next = atOverview || !follow ? fit : { target: [follow[0], follow[1], 0], zoom: state.zoom };
+  deck.setProps({
+    initialViewState: {
+      ...next,
+      transitionDuration: TRANSITION_MS,
+      transitionInterpolator: new LinearInterpolator(["target", "zoom"]),
+    } as OrthographicViewState,
+  });
+  state.zoom = next.zoom as number;
+  state.transitioning = true;
   render();
   window.setTimeout(() => {
     state.transitioning = false;
@@ -639,19 +677,10 @@ function animateLayoutChange() {
 
 function setView(view: View) {
   if (state.view === view) return;
-  state.view = view;
-  setPressed("view", view);
-  if (state.selected !== null) {
-    if (!inView(state.selected)) {
-      state.selected = null;
-      $("details").hidden = true;
-    } else selectedDistances = distancesFrom(data.words[state.selected], data.words, inView);
-  }
-  state.ladder = null;
-  $("ladder-result").textContent = "";
-  updateStatus();
-  animateLayoutChange();
-  if (state.selected !== null) showDetails(state.selected);
+  changeLayout(() => {
+    state.view = view;
+    setPressed("view", view);
+  });
 }
 
 function setupControls() {
@@ -660,9 +689,11 @@ function setupControls() {
   );
   document.querySelectorAll<HTMLButtonElement>("[data-layout]").forEach((b) =>
     b.addEventListener("click", () => {
-      state.layout = b.dataset.layout as Layout;
-      setPressed("layout", state.layout);
-      animateLayoutChange();
+      if (state.layout === b.dataset.layout) return;
+      changeLayout(() => {
+        state.layout = b.dataset.layout as Layout;
+        setPressed("layout", state.layout);
+      });
     }),
   );
   const colorBy = $<HTMLSelectElement>("color-by");

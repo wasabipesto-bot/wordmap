@@ -2,7 +2,8 @@
 
 meta.json    counts, category names, column directory, layout list, sources
 words.txt    the vocabulary, one word per line, most frequent first (index = word id)
-columns.bin  numeric columns and layout coordinates, 4-byte aligned, little-endian
+columns.bin  per-word columns and layout coordinates, 4-byte aligned, little-endian; floats are
+             stored as uint16 across a range given in meta.json
 defs.json    per word: [lemma or 0, [pos, text, via word?, via text?], ...]; loaded after first paint
 ESDB-COPYRIGHT.txt  the English Speller Database's notice, which must accompany data derived from it
 """
@@ -41,31 +42,42 @@ def main() -> None:
         out[base_ids] = values
         return out
 
-    base_density = np.full(n, np.nan, np.float32)
+    base_density = np.zeros(n, np.float32)  # non-base words are hidden in base views anyway
     base_density[base_ids] = nb["base_density_vs_length"]
-    columns = {
-        "pos": vocab["pos"].map(POS_CLASSES.index).to_numpy(np.uint8),
-        "length": vocab["length"].to_numpy(np.uint8),
-        "is_base": is_base,
-        "zipf": vocab["zipf"].to_numpy(np.float32),
-        "n1": np.minimum(nb["n1"], 65535).astype(np.uint16),
-        "n2": np.minimum(nb["n2"], 65535).astype(np.uint16),
-        "old20": nb["old20"].astype(np.float32),
-        "density_vs_length": nb["density_vs_length"].astype(np.float32),
-        "base_density_vs_length": base_density,
-        "umap": lay["umap"].astype(np.float32).ravel(),
-        "densmap": lay["densmap"].astype(np.float32).ravel(),
-        "base_umap": full(lay["base_umap"], lay["umap"]).astype(np.float32).ravel(),
-        "base_densmap": full(lay["base_densmap"], lay["densmap"]).astype(np.float32).ravel(),
+    layouts = {
+        "umap": lay["umap"],
+        "densmap": lay["densmap"],
+        "base_umap": full(lay["base_umap"], lay["umap"]),
+        "base_densmap": full(lay["base_densmap"], lay["densmap"]),
     }
+    # Small integers are stored as uint8. Floats are stored as uint16 across their own range (per
+    # axis for layouts), far finer than a pixel and half the download; the site maps them back.
+    columns = [
+        ("pos", vocab["pos"].map(POS_CLASSES.index).to_numpy(np.uint8)),
+        ("length", vocab["length"].to_numpy(np.uint8)),
+        ("is_base", is_base),
+        ("zipf", vocab["zipf"].to_numpy(np.float32)),
+        ("density_vs_length", nb["density_vs_length"]),
+        ("base_density_vs_length", base_density),
+        *layouts.items(),
+    ]
     SITE_DATA.mkdir(parents=True, exist_ok=True)
     directory, offset = [], 0
     with open(SITE_DATA / "columns.bin", "wb") as f:
-        for name, arr in columns.items():
-            raw = arr.astype(arr.dtype.newbyteorder("<")).tobytes()
-            directory.append({"name": name, "dtype": arr.dtype.name, "offset": offset, "length": arr.size})
+        for name, arr in columns:
+            entry = {"name": name, "offset": offset, "length": int(arr.size)}
+            if arr.dtype == np.uint8:
+                raw, entry["dtype"] = arr.tobytes(), "uint8"
+            else:
+                # x/y layouts are interleaved (x0, y0, x1, y1, ...) with one range per axis.
+                xy = arr.reshape(-1, 2) if arr.ndim == 2 else arr.reshape(-1, 1)
+                lo, hi = xy.min(0), xy.max(0)
+                q = np.round((xy - lo) / np.where(hi > lo, hi - lo, 1) * 65535).astype("<u2")
+                raw, entry["dtype"] = q.tobytes(), "uint16"
+                entry["range"] = [*map(float, lo), *map(float, hi)]
             pad = (-len(raw)) % 4
             f.write(raw + b"\0" * pad)
+            directory.append(entry)
             offset += len(raw) + pad
 
     (SITE_DATA / "words.txt").write_text("\n".join(vocab["word"]) + "\n")
@@ -81,19 +93,17 @@ def main() -> None:
         defs.append(entry)
     (SITE_DATA / "defs.json").write_bytes(orjson.dumps(defs))
 
-    def extent(flat: np.ndarray) -> list[float]:
-        xy = flat.reshape(-1, 2)
-        return [float(v) for v in (*xy.min(0), *xy.max(0))]
-
     meta = {
         "generated": datetime.datetime.now(datetime.UTC).date().isoformat(),
         "count": n,
         "baseCount": int(is_base.sum()),
         "posClasses": POS_CLASSES,
         "columns": directory,
+        # Bounds of the words each layout shows (base layouts: base forms only), for framing.
         "layouts": {
-            name: {"column": name, "bounds": extent(columns[name])}
-            for name in ("umap", "densmap", "base_umap", "base_densmap")
+            name: {"column": name, "bounds": [*map(float, shown.min(0)), *map(float, shown.max(0))]}
+            for name, xy in layouts.items()
+            for shown in [xy[base_ids] if name.startswith("base_") else xy]
         },
         "zipfRange": [float(vocab["zipf"].min()), float(vocab["zipf"].max())],
         "maxLength": int(vocab["length"].max()),
