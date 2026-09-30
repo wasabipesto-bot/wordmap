@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>wordmap · the shape of English spelling</title>
+    <meta
+      name="description"
+      content="An interactive map of the 50,000 most common English words, placed so that words a few letter edits apart sit close together."
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='5' cy='6' r='2.5' fill='%232a78d6'/%3E%3Ccircle cx='11' cy='5' r='2' fill='%23eb6834'/%3E%3Ccircle cx='9' cy='11' r='2.5' fill='%231baf7a'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="toolbar" aria-label="Map controls">
+      <h1 class="brand">wordmap</h1>
+
+      <div class="search">
+        <label class="visually-hidden" for="search">Search for a word, or type an invented one</label>
+        <input id="search" type="search" placeholder="Search or invent a word" autocomplete="off"
+          spellcheck="false" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false" />
+        <ul id="suggestions" role="listbox" hidden></ul>
+      </div>
+
+      <div class="segmented" role="group" aria-label="Words">
+        <button type="button" data-view="all" aria-pressed="true" title="Every word form: run, runs, running, ran">All forms</button>
+        <button type="button" data-view="base" aria-pressed="false" title="Base forms only: run, but not runs, running, ran">Base forms</button>
+      </div>
+
+      <div class="segmented" role="group" aria-label="Layout">
+        <button type="button" data-layout="umap" aria-pressed="true" title="UMAP: keeps each word's close neighbours together">UMAP</button>
+        <button type="button" data-layout="densmap" aria-pressed="false" title="densMAP: spacing also reflects how crowded each neighbourhood really is">densMAP</button>
+      </div>
+
+      <label class="field">
+        <span>Colour</span>
+        <select id="color-by">
+          <option value="pos">Part of speech</option>
+          <option value="length">Length</option>
+          <option value="frequency">Frequency</option>
+          <option value="crowding">Crowding</option>
+        </select>
+      </label>
+
+      <details class="dropdown" id="pos-filter">
+        <summary>Parts of speech</summary>
+        <div class="dropdown-body" id="pos-options"></div>
+      </details>
+
+      <div class="field length" role="group" aria-labelledby="length-label">
+        <span id="length-label">Length</span>
+        <input id="len-min" type="number" min="1" value="1" aria-label="Minimum length" />
+        <span aria-hidden="true">–</span>
+        <input id="len-max" type="number" min="1" value="30" aria-label="Maximum length" />
+      </div>
+
+      <label class="field top-n">
+        <span title="Only the most common words">Top</span>
+        <input id="top-n" type="range" min="0" max="100" step="1" value="100" />
+        <output id="top-n-value" for="top-n">50,000</output>
+      </label>
+
+      <div class="toolbar-end">
+        <button type="button" id="ladder-toggle" aria-expanded="false" aria-controls="ladder">Word ladder</button>
+        <button type="button" id="theme-toggle" title="Switch light / dark" aria-label="Switch light or dark theme">◐</button>
+        <button type="button" id="about-open" title="About this map" aria-label="About this map">?</button>
+      </div>
+    </header>
+
+    <div class="stage">
+      <main id="map" aria-label="Map of English words. Use the search box to reach any word."></main>
+
+      <section id="ladder" class="panel ladder" hidden aria-label="Word ladder">
+        <form id="ladder-form">
+          <p class="panel-title">Word ladder</p>
+          <p class="hint">Change one letter at a time (or add or drop one) to get from one word to another.</p>
+          <div class="ladder-inputs">
+            <input id="ladder-from" placeholder="from" autocomplete="off" spellcheck="false" aria-label="Start word" />
+            <span aria-hidden="true">→</span>
+            <input id="ladder-to" placeholder="to" autocomplete="off" spellcheck="false" aria-label="End word" />
+            <button type="submit">Find</button>
+          </div>
+          <p id="ladder-result" class="ladder-result" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <aside id="details" class="panel details" hidden aria-live="polite">
+        <button type="button" class="close" id="details-close" aria-label="Close details">×</button>
+        <div id="details-body"></div>
+      </aside>
+
+      <div id="legend" class="legend" aria-label="Legend"></div>
+      <p id="status" class="status" aria-live="polite"></p>
+    </div>
+    <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+    <div id="loading" class="loading">Loading the map…</div>
+
+    <dialog id="about" aria-labelledby="about-title">
+      <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+      <h2 id="about-title">About wordmap</h2>
+      <p>
+        Each dot is one of the 50,000 most common English words. Words are placed so that words a few
+        letters apart sit near each other. The distance is Levenshtein distance: how many single-letter
+        insertions, deletions or substitutions turn one word into the other (<i>cat → cot</i> is 1,
+        <i>cat → coast</i> is 2). A 2-D map can't keep every one of those distances. It is built with
+        UMAP from each word's 15 nearest words, so small neighbourhoods are faithful and long distances
+        across the map are not. Click a word to see its true neighbours.
+      </p>
+      <p>
+        What you'll see is mostly <b>length</b> (short words at one end, long words at the other) and
+        <b>shared endings</b>: the <i>-ing</i>, <i>-tion</i> and <i>-ness</i> families form their own
+        regions. <b>densMAP</b> also keeps how crowded each neighbourhood is. <b>Base forms</b> drops
+        inflections (<i>runs</i>, <i>ran</i>, <i>running</i>) to show structure beyond grammar endings.
+      </p>
+      <h3>Data</h3>
+      <ul class="sources">
+        <li>Word frequencies: <a href="https://github.com/rspeer/wordfreq">wordfreq</a> by Robyn Speer (CC BY-SA 4.0).</li>
+        <li>Which strings are real words, base forms, and slurs to exclude: the
+          <a href="https://github.com/en-wl/wordlist">English Speller Database</a> (formerly SCOWL) by Kevin Atkinson.</li>
+        <li>Part of speech and how often a word is used as a name:
+          <a href="https://www.ugent.be/pp/experimentele-psychologie/en/research/documents/subtlexus">SUBTLEX-US</a>
+          (Brysbaert, New &amp; Keuleers, 2012; CC BY-SA).</li>
+        <li>Definitions: <a href="https://en.wiktionary.org/">Wiktionary</a> contributors, extracted by
+          <a href="https://kaikki.org/">kaikki.org</a> / Wiktextract (CC BY-SA 4.0).</li>
+      </ul>
+      <p class="fine">
+        Code: MIT licence. The map data is derived from the sources above and shared under CC BY-SA 4.0.
+        Source and instructions to rebuild everything: <a href="https://github.com/wasabipesto-bot/wordmap">github.com/wasabipesto-bot/wordmap</a>.
+        <span id="about-generated"></span>
+      </p>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
